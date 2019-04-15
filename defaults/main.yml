@@ -1,0 +1,43 @@
+---
+
+lxd_host: localhost
+
+# Name of the LXD Profile
+profile_name: default
+
+# Name of the Bridge Interface
+bridge_interface: lxcbr
+container_name: container
+container_state: started
+container_user: ubuntu
+container_password: ~
+
+container_host: ~
+
+# TODO Make config{} into a template
+config: {}
+
+# Architecture
+os_arch: amd64
+# Ubuntu Release
+os_release: bionic
+
+# The groups to add the host to the host in the inventory
+hostgroups: lxc_containers
+
+image_server: https://images.linuxcontainers.org
+
+profile_networks:
+  eth0:
+    name: eth0
+    nictype: bridged
+    parent: "lxcbr0"
+    type: nic
+
+profile_disks:
+  root:
+    path: /
+    pool: default
+    type: disk
+
+profile_devices: {}

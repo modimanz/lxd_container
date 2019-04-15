@@ -1,0 +1,83 @@
+---
+
+- name: Create the LXD Profile
+  lxd_profile:
+    name: "{{ profile_name }}"
+    #state: present
+    config: {}
+    description: ""
+    devices: "{{ profile_devices }}"
+
+# Create the LXD Container
+- name: Create the LXD Container
+  lxd_container:
+    name: "{{ container_name }}"
+    state: "{{ container_state }}"
+    source:
+      type: image
+      mode: pull
+      server: "{{ image_server }}"
+      protocol: lxd
+      alias: "ubuntu/{{ os_release }}/{{ os_arch }}"
+    profiles:
+      - "{{ profile_name }}"
+    config: "{{ config }}"
+    wait_for_ipv4_addresses: true
+    timeout: 600
+
+# TODO Can wepass the conainter anip address to use?
+# TODO Get the Container IPv4 Address
+
+# TODO Create the Container User
+#- name: Create the Container User
+#  user:
+#    name:
+
+#
+- name: Include Remote LXC Config
+  include_tasks: remote-config.yml
+
+- name: Add the container to the inventory
+  add_host:
+    name: "{{ container_name }}"
+    ansible_connection: lxd
+    ansible_host: "{{inventory_hostname}}:{{container_name}}"
+    groups: "{{ hostgroups }}"
+
+## ADD the Git Repo Container
+- name: Add the container hostgroup to the inventory file
+  become: no
+  lineinfile:
+    dest: "{{ inventory_dir }}/hosts"
+    line: "[{{ hostgroups }}]"
+    backup: yes
+    state: present
+  delegate_to: localhost
+
+- name: Add git container host to the the git hostgroup
+  become: no
+  lineinfile:
+    dest: "{{ inventory_dir }}/hosts"
+    line: '{{ container_name }} ansible_connection=lxd ansible_host={{ inventory_hostname }}:{{container_name }}'
+    regexp: '{{ container_name|replace("-", "\-")}} ansible\_connection=lxd'
+    insertafter: '\[{{ hostgroups|replace("-", "\-")}}\]'
+    state: present
+  delegate_to: localhost
+
+## Reload the Inventory file
+- name: Relaod the Inventory file
+  meta: refresh_inventory
+
+- name: check python is installed in container
+  delegate_to: "{{ container_name }}"
+  ansible_connection: lxd
+  raw: dpkg -s python
+  register: python_install_check
+  failed_when: python_install_check.rc not in [0, 1]
+  changed_when: false
+
+- name: install python in container
+  delegate_to: "{{ container_name }}"
+  ansible_connection: lxd
+  raw: apt-get install -y python
+  when: python_install_check.rc == 1
